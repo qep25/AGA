@@ -51,7 +51,6 @@ if os.path.exists(SAVE_PATH):
         df["Start"] = pd.to_datetime(df["Start"], errors="coerce")
         df["Finish"] = pd.to_datetime(df["Finish"], errors="coerce")
     except Exception:
-        # If error, recreate fresh
         df = pd.DataFrame({"Task": topics})
         df["Start"] = pd.NaT
         df["Finish"] = pd.NaT
@@ -99,7 +98,10 @@ if view_mode == "Gantt Chart":
             y="Task",
             color="Task"
         )
-        fig.update_traces(width=0.6)
+        fig.update_traces(
+            width=0.9,   # wider bars (align center nicely)
+            offset=0     # force perfect center
+        )
         fig.update_yaxes(
             autorange="reversed",
             showgrid=show_grid
@@ -110,7 +112,7 @@ if view_mode == "Gantt Chart":
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
         )
-        # Auto zoom x-axis based on data
+        # Auto zoom x-axis based on earliest/latest Start/Finish
         fig.update_layout(
             xaxis_range=[
                 chart_df["Start"].min() - pd.Timedelta(days=2),
@@ -134,7 +136,6 @@ if view_mode == "Gantt Chart":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
-
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
