@@ -176,24 +176,8 @@ if not df_edit["Start"].isna().all():
             for week in weeks:
                 grid.at[task, week] = "active"
 
-        # 🎨 Random colors for each task
-        task_colors = {}
-        for task in topics:
-            r = random.randint(100, 255)
-            g = random.randint(100, 255)
-            b = random.randint(100, 255)
-            task_colors[task] = f'rgb({r},{g},{b})'
-
-        def style_matrix(val, task=None):
-            if val == "active" and task:
-                return f'background-color: {task_colors.get(task, "lightcoral")}; color: black; text-align: center; font-weight: bold;'
-            return 'text-align: center;'
-
-        styled_grid = grid.copy()
-        for task in grid.index:
-            styled_grid.loc[task] = grid.loc[task].apply(lambda val: style_matrix(val, task=task))
-
-        st.dataframe(styled_grid, use_container_width=True)
+        # 🧹 Show clean active labels, no color
+        st.dataframe(grid, use_container_width=True)
 
 else:
     st.info("⏳ Please add Start and Finish dates to see the timeline.")
