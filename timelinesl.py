@@ -106,7 +106,7 @@ if view_mode == "Gantt Chart":
         )
         fig.update_layout(
             showlegend=False,
-            height=0.6,
+            height=1000,
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
         )
@@ -118,11 +118,11 @@ if view_mode == "Gantt Chart":
         )
 
         if show_border:
-            fig.update_traces(marker_line_color='black', marker_line_width=1)
+            fig.update_traces(marker_line_color='black', marker_line_width=0.5)
 
         if add_today_line:
             today = datetime.today()
-            fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
+            fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
     else:
