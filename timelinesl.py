@@ -42,7 +42,7 @@ topics = [
     "H. Targeted Subsidies to Support Low-Income Users"
 ]
 
-# Load or initialize CSV
+# Load or create dataframe
 if os.path.exists(SAVE_PATH):
     df = pd.read_csv(SAVE_PATH, parse_dates=["Start", "Finish"])
 else:
@@ -56,9 +56,9 @@ df["Duration (days)"] = (df["Finish"] - df["Start"]).dt.days
 # Sidebar settings
 st.sidebar.header("⚙️ Graph Settings")
 show_grid = st.sidebar.checkbox("Show X and Y Axis Grid", value=True)
-show_border = st.sidebar.checkbox("Show Task Bar Borders", value=False)
-add_today_line = st.sidebar.checkbox("Add Vertical Line for Today", value=False)
-view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Table View"])
+show_border = st.sidebar.checkbox("Show Task Bar Borders (Timeline only)", value=False)
+add_today_line = st.sidebar.checkbox("Add Vertical Line for Today (Timeline only)", value=False)
+view_mode = st.sidebar.radio("View Mode", ["Gantt Chart (Timeline)", "Gantt Chart (Bar Chart)", "Table View"])
 
 # Editable table
 st.subheader("📝 Edit Dates Inline")
@@ -80,22 +80,18 @@ df_edit.to_csv(SAVE_PATH, index=False)
 
 # Show View
 st.subheader("📊 Timeline View")
-if view_mode == "Gantt Chart":
+if view_mode == "Gantt Chart (Timeline)":
     if not df_edit["Start"].isna().all():
         chart_df = df_edit.dropna(subset=["Start", "Finish"])
         fig = px.timeline(chart_df, x_start="Start", x_end="Finish", y="Task", color="Task")
         fig.update_traces(width=0.6)  # Thicker task bars
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(showlegend=False, height=1000, margin=dict(l=50, r=50, t=50, b=50))
-        fig.update_layout(bargap=0.01)
-
-        # Correct Y axis settings (no categoryspacing)
+        fig.update_layout(bargap=0)
         fig.update_yaxes(
-            categoryorder="total ascending",  # keeps nice order
+            categoryorder="total ascending",
             showgrid=show_grid
         )
-
-        # X axis date settings
         fig.update_xaxes(
             dtick="D3",
             tickformat="%d %b",
@@ -108,11 +104,45 @@ if view_mode == "Gantt Chart":
 
         if add_today_line:
             today = datetime.today()
-            fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
+            fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("⏳ Add dates to any task above to display the Gantt chart.")
+
+elif view_mode == "Gantt Chart (Bar Chart)":
+    if not df_edit["Start"].isna().all():
+        chart_df = df_edit.dropna(subset=["Start", "Finish"])
+        chart_df["Duration (days)"] = (chart_df["Finish"] - chart_df["Start"]).dt.days
+
+        fig = px.bar(
+            chart_df,
+            x="Duration (days)",
+            y="Task",
+            orientation="h",
+            color="Task",
+            height=40 * len(chart_df),  # tighter per task
+        )
+        fig.update_traces(
+            texttemplate="%{x} days",
+            textposition="inside"
+        )
+        fig.update_layout(
+            yaxis=dict(
+                autorange="reversed",
+                title=""
+            ),
+            xaxis=dict(
+                title="Duration (days)",
+                showgrid=True
+            ),
+            bargap=0.0,
+            margin=dict(l=50, r=50, t=50, b=50),
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("⏳ Add dates to any task above to display the bar Gantt chart.")
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
