@@ -1,4 +1,5 @@
 import streamlit as st
+import plotly.express as px
 import pandas as pd
 import os
 import io
@@ -6,7 +7,7 @@ from datetime import datetime
 
 # ── Page setup ──
 st.set_page_config(layout="wide")
-st.title("📆 TNB Tariff Communication Timeline (Matrix View)")
+st.title("📆 TNB Tariff Communication Timeline (Gantt + Matrix View)")
 st.markdown("Use the editor below to update task dates directly. Duration will update automatically.")
 
 SAVE_PATH = "saved_timeline.csv"
@@ -62,8 +63,9 @@ else:
 # ── Calculate Duration ──
 df["Duration (days)"] = (df["Finish"] - df["Start"]).dt.days
 
-# ── Sidebar settings ──
+# ── Sidebar Settings ──
 st.sidebar.header("⚙️ Settings")
+view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Matrix View"])
 show_save = st.sidebar.checkbox("Show Save Button", value=True)
 show_download = st.sidebar.checkbox("Show Download Button", value=True)
 
@@ -98,53 +100,77 @@ if show_download:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# ── Matrix View: Task vs Month Week ──
-st.subheader("📊 Timeline Matrix (Month-Week View)")
+# ── View Selection ──
+st.subheader(f"📊 {view_mode}")
 
-# Only show if Start/Finish available
 if not df_edit["Start"].isna().all():
+
     chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
 
-    # Define month-week label function
-    def month_week_label(date):
-        if pd.isnull(date):
-            return None
-        month_start = pd.Timestamp(date.year, date.month, 1)
-        days_since_month_start = (date - month_start).days
-        week_count = 0
-        for d in pd.date_range(start=month_start, end=date):
-            if d.weekday() < 5:  # << Correct: weekday() as method
-                if d == date:
-                    break
-                if d.weekday() == 0 and (d - month_start).days != 0:
-                    week_count += 1
-        return f"{date.strftime('%b')} W{week_count + 1}"
+    if view_mode == "Gantt Chart":
+        fig = px.timeline(
+            chart_df,
+            x_start="Start",
+            x_end="Finish",
+            y="Task",
+            color="Task"
+        )
+        fig.update_traces(width=0.9, offset=0)
+        fig.update_yaxes(autorange="reversed", showgrid=True)
+        fig.update_layout(
+            showlegend=False,
+            height=1000,
+            margin=dict(l=50, r=50, t=50, b=50),
+            bargap=0
+        )
+        fig.update_xaxes(
+            dtick="D3",
+            tickformat="%d %b",
+            tickangle=30,
+            showgrid=True
+        )
+        today = datetime.today()
+        fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
 
-    # Map each task to active week labels
-    task_week_mapping = {}
-    for idx, row in chart_df.iterrows():
-        start_date = row["Start"]
-        finish_date = row["Finish"]
-        all_dates = pd.date_range(start=start_date, end=finish_date, freq="D")
-        working_days = all_dates[all_dates.weekday < 5]
-        week_labels = working_days.map(month_week_label).unique()
-        task_week_mapping[row["Task"]] = week_labels
+        st.plotly_chart(fig, use_container_width=True)
 
-    # Create matrix
-    all_weeks = sorted(set(label for labels in task_week_mapping.values() for label in labels))
-    grid = pd.DataFrame("", index=chart_df["Task"], columns=all_weeks)
+    elif view_mode == "Matrix View":
+        def month_week_label(date):
+            if pd.isnull(date):
+                return None
+            month_start = pd.Timestamp(date.year, date.month, 1)
+            days_since_month_start = (date - month_start).days
+            week_count = 0
+            for d in pd.date_range(start=month_start, end=date):
+                if d.weekday() < 5:  # Mon-Fri only
+                    if d == date:
+                        break
+                    if d.weekday() == 0 and (d - month_start).days != 0:
+                        week_count += 1
+            return f"{date.strftime('%b')} W{week_count + 1}"
 
-    for task, weeks in task_week_mapping.items():
-        for week in weeks:
-            grid.at[task, week] = "active"
+        task_week_mapping = {}
+        for idx, row in chart_df.iterrows():
+            start_date = row["Start"]
+            finish_date = row["Finish"]
+            all_dates = pd.date_range(start=start_date, end=finish_date, freq="D")
+            working_days = all_dates[all_dates.weekday < 5]
+            week_labels = working_days.map(month_week_label).unique()
+            task_week_mapping[row["Task"]] = week_labels
 
-    # Show colored matrix
-    def color_active(val):
-        if val == "active":
-            return 'background-color: lightcoral; color: black;'
-        return ''
+        all_weeks = sorted(set(label for labels in task_week_mapping.values() for label in labels))
+        grid = pd.DataFrame("", index=chart_df["Task"], columns=all_weeks)
 
-    st.dataframe(grid.style.applymap(color_active), use_container_width=True)
+        for task, weeks in task_week_mapping.items():
+            for week in weeks:
+                grid.at[task, week] = "active"
+
+        def color_active(val):
+            if val == "active":
+                return 'background-color: lightcoral; color: black;'
+            return ''
+
+        st.dataframe(grid.style.applymap(color_active), use_container_width=True)
 
 else:
-    st.info("⏳ Please add Start and Finish dates to see the Timeline Matrix.")
+    st.info("⏳ Please add Start and Finish dates to see the timeline.")
