@@ -107,6 +107,10 @@ if not df_edit["Start"].isna().all():
 
     chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
 
+    # 🛠 Force correct task order here!
+    chart_df["Task"] = pd.Categorical(chart_df["Task"], categories=topics, ordered=True)
+    chart_df = chart_df.sort_values("Task")
+
     if view_mode == "Gantt Chart":
         fig = px.timeline(
             chart_df,
