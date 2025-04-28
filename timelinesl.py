@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 import os
+import io
 from datetime import datetime
 
 # ── Page setup ──
@@ -81,11 +82,30 @@ df_edit = st.data_editor(
     }
 )
 
-# ── Recalculate and save updated data ──
-df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
-df_edit.to_csv(SAVE_PATH, index=False)
+# ── Unsaved warning ──
+edited = not df_edit.equals(df)
+if edited:
+    st.warning("⚠️ You have unsaved changes. Don't forget to click '💾 Save Timeline'!")
 
-# ── Show either Gantt chart or Table view ──
+# ── Save button ──
+if st.button("💾 Save Timeline", type="primary"):
+    df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
+    df_edit.to_csv(SAVE_PATH, index=False)
+    st.success("✅ Timeline saved successfully!")
+
+# ── Download Excel button ──
+excel_buffer = io.BytesIO()
+with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+    df_edit.to_excel(writer, index=False, sheet_name="Timeline")
+
+st.download_button(
+    label="📥 Download Timeline as Excel",
+    data=excel_buffer,
+    file_name="tnb_timeline.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# ── Show Timeline View or Table ──
 st.subheader("📊 Timeline View")
 
 if view_mode == "Gantt Chart":
@@ -99,8 +119,8 @@ if view_mode == "Gantt Chart":
             color="Task"
         )
         fig.update_traces(
-            width=0.9,   # wider bars (align center nicely)
-            offset=0     # force perfect center
+            width=0.9,   # wider bars for better alignment
+            offset=0
         )
         fig.update_yaxes(
             autorange="reversed",
@@ -112,7 +132,6 @@ if view_mode == "Gantt Chart":
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
         )
-        # Auto zoom x-axis based on earliest/latest Start/Finish
         fig.update_layout(
             xaxis_range=[
                 chart_df["Start"].min() - pd.Timedelta(days=2),
