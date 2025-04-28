@@ -2,16 +2,16 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 import os
-from datetime import datetime
+from datetime import date, datetime
 
-# ── Page setup ──
+# Page setup
 st.set_page_config(layout="wide")
 st.title("📆 TNB Tariff Communication Timeline")
 st.markdown("Use the editor below to update task dates directly. Duration will update automatically.")
 
 SAVE_PATH = "saved_timeline.csv"
 
-# ── Your full topic list ──
+# Full topic list
 topics = [
     "1. Majority of Households Are Not Affected",
     "2. The Tariff Hike is Targeted and Fair",
@@ -42,47 +42,34 @@ topics = [
     "H. Targeted Subsidies to Support Low-Income Users"
 ]
 
-# ── Robust CSV loading with bad‐line skipping ──
+# Improved CSV loading
 if os.path.exists(SAVE_PATH):
     try:
-        # skip any malformed lines
-        df_raw = pd.read_csv(SAVE_PATH, on_bad_lines="skip", engine="python")
+        df = pd.read_csv(SAVE_PATH)
+        if "Task" not in df.columns:
+            raise ValueError("Invalid file structure")
+        df["Start"] = pd.to_datetime(df["Start"], dayfirst=True, errors="coerce")
+        df["Finish"] = pd.to_datetime(df["Finish"], dayfirst=True, errors="coerce")
     except Exception:
-        df_raw = pd.DataFrame()
-    # if Task column missing, fallback to fresh
-    if "Task" not in df_raw.columns:
         df = pd.DataFrame({"Task": topics})
         df["Start"] = pd.NaT
         df["Finish"] = pd.NaT
-    else:
-        df = df_raw.copy()
-        # coerce dates, unparseable → NaT
-        df["Start"] = pd.to_datetime(df.get("Start"), dayfirst=True, errors="coerce")
-        df["Finish"] = pd.to_datetime(df.get("Finish"), dayfirst=True, errors="coerce")
-        # ensure Task column only topics if empty
-        missing = df["Task"].isna()
-        if missing.any():
-            df.loc[missing, "Task"] = topics[:missing.sum()]
 else:
     df = pd.DataFrame({"Task": topics})
     df["Start"] = pd.NaT
     df["Finish"] = pd.NaT
 
-# ── Calculate Duration ──
+# Calculate duration
 df["Duration (days)"] = (df["Finish"] - df["Start"]).dt.days
 
-# ── Sidebar settings ──
+# Sidebar settings
 st.sidebar.header("⚙️ Graph Settings")
-show_grid      = st.sidebar.checkbox("Show X and Y Axis Grid", value=True)
-show_border    = st.sidebar.checkbox("Show Task Bar Borders (Timeline only)", value=False)
-add_today_line = st.sidebar.checkbox("Add Vertical Line for Today (Timeline only)", value=False)
-view_mode      = st.sidebar.radio("View Mode", [
-    "Gantt Chart (Timeline)",
-    "Gantt Chart (Bar Chart)",
-    "Table View"
-])
+show_grid = st.sidebar.checkbox("Show X and Y Axis Grid", value=True)
+show_border = st.sidebar.checkbox("Show Task Bar Borders", value=False)
+add_today_line = st.sidebar.checkbox("Add Vertical Line for Today", value=False)
+view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Table View"])
 
-# ── Editable table ──
+# Editable table
 st.subheader("📝 Edit Dates Inline")
 df_edit = st.data_editor(
     df,
@@ -94,50 +81,50 @@ df_edit = st.data_editor(
     }
 )
 
-# ── Recalculate & save ──
+# Recalculate and save updated data
 df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
 df_edit.to_csv(SAVE_PATH, index=False)
 
-# ── Render View ──
+# Timeline or Table
 st.subheader("📊 Timeline View")
-
-if view_mode == "Gantt Chart (Timeline)":
+if view_mode == "Gantt Chart":
     if not df_edit["Start"].isna().all():
-        dd = df_edit.dropna(subset=["Start","Finish"])
-        fig = px.timeline(dd, x_start="Start", x_end="Finish", y="Task", color="Task")
+        chart_df = df_edit.dropna(subset=["Start", "Finish"])
+        fig = px.timeline(
+            chart_df,
+            x_start="Start",
+            x_end="Finish",
+            y="Task",
+            color="Task"
+        )
         fig.update_traces(width=0.6)
-        fig.update_yaxes(autorange="reversed", showgrid=show_grid)
-        fig.update_layout(showlegend=False, height=1000, margin=dict(l=50,r=50,t=50,b=50), bargap=0)
-        fig.update_xaxes(dtick="D3", tickformat="%d %b", tickangle=30, showgrid=show_grid)
+        fig.update_yaxes(
+            autorange="reversed",
+            showgrid=show_grid
+        )
+        fig.update_layout(
+            showlegend=False,
+            height=1000,
+            margin=dict(l=50, r=50, t=50, b=50),
+            bargap=0
+        )
+        fig.update_xaxes(
+            dtick="D3",
+            tickformat="%d %b",
+            tickangle=30,
+            showgrid=show_grid
+        )
+
         if show_border:
             fig.update_traces(marker_line_color='black', marker_line_width=1)
+
         if add_today_line:
-            fig.add_vline(x=datetime.today(), line_width=2, line_dash="dash", line_color="red")
+            today = datetime.today()
+            fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
+
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("⏳ Add dates above to display the Gantt chart.")
+        st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
 
-elif view_mode == "Gantt Chart (Bar Chart)":
-    if not df_edit["Start"].isna().all():
-        dd = df_edit.dropna(subset=["Start","Finish"]).copy()
-        dd["Duration"] = (dd["Finish"] - dd["Start"]).dt.days
-        fig = px.bar(
-            dd,
-            x="Duration",
-            y="Task",
-            base="Start",
-            orientation="h",
-            color="Task",
-            height=40 * len(dd),
-            hover_data={"Start":True,"Finish":True,"Duration":True}
-        )
-        fig.update_traces(width=0.8, showlegend=False)
-        fig.update_xaxes(type='date', tickformat="%d %b", showgrid=show_grid)
-        fig.update_yaxes(autorange="reversed", showgrid=show_grid)
-        fig.update_layout(margin=dict(l=50,r=50,t=50,b=50), bargap=0.0)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("⏳ Add dates above to display the bar-chart Gantt.")
-
-else:
+elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
