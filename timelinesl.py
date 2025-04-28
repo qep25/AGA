@@ -110,6 +110,13 @@ if view_mode == "Gantt Chart":
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
         )
+        # Auto zoom x-axis based on data
+        fig.update_layout(
+            xaxis_range=[
+                chart_df["Start"].min() - pd.Timedelta(days=2),
+                chart_df["Finish"].max() + pd.Timedelta(days=2)
+            ]
+        )
         fig.update_xaxes(
             dtick="D3",
             tickformat="%d %b",
@@ -118,15 +125,16 @@ if view_mode == "Gantt Chart":
         )
 
         if show_border:
-            fig.update_traces(marker_line_color='black', marker_line_width=0.5)
+            fig.update_traces(marker_line_color='black', marker_line_width=1)
 
         if add_today_line:
             today = datetime.today()
-            fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
+            fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
+
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
