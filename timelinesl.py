@@ -69,7 +69,7 @@ view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Matrix View"])
 show_save = st.sidebar.checkbox("Show Save Button", value=True)
 show_download = st.sidebar.checkbox("Show Download Button", value=True)
 
-# ── Editable table ──
+# ── Editable Table ──
 st.subheader("📝 Edit Task Dates Inline")
 df_edit = st.data_editor(
     df,
@@ -81,14 +81,14 @@ df_edit = st.data_editor(
     }
 )
 
-# ── Save button ──
+# ── Save Button ──
 if show_save:
     if st.button("💾 Save Timeline", type="primary"):
         df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
         df_edit.to_csv(SAVE_PATH, index=False)
         st.success("✅ Timeline saved successfully!")
 
-# ── Download Excel button ──
+# ── Download Excel Button ──
 if show_download:
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
@@ -130,7 +130,7 @@ if not df_edit["Start"].isna().all():
             showgrid=True
         )
         today = datetime.today()
-        fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
+        fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -158,19 +158,22 @@ if not df_edit["Start"].isna().all():
             week_labels = working_days.map(month_week_label).unique()
             task_week_mapping[row["Task"]] = week_labels
 
+        # Build grid with manual task order
+        ordered_tasks = [task for task in topics if task in chart_df["Task"].values]
         all_weeks = sorted(set(label for labels in task_week_mapping.values() for label in labels))
-        grid = pd.DataFrame("", index=chart_df["Task"], columns=all_weeks)
+        grid = pd.DataFrame("", index=ordered_tasks, columns=all_weeks)
 
         for task, weeks in task_week_mapping.items():
             for week in weeks:
                 grid.at[task, week] = "active"
 
-        def color_active(val):
+        # Improved styling
+        def style_matrix(val):
             if val == "active":
-                return 'background-color: lightcoral; color: black;'
-            return ''
+                return 'background-color: lightcoral; color: black; text-align: center; font-weight: bold;'
+            return 'text-align: center;'
 
-        st.dataframe(grid.style.applymap(color_active), use_container_width=True)
+        st.dataframe(grid.style.applymap(style_matrix), use_container_width=True)
 
 else:
     st.info("⏳ Please add Start and Finish dates to see the timeline.")
