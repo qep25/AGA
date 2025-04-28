@@ -89,11 +89,11 @@ if view_mode == "Gantt Chart":
         fig.update_layout(showlegend=False, height=1000, margin=dict(l=50, r=50, t=50, b=50))
         fig.update_layout(bargap=0)
 
-        # Correct Y axis settings (no categoryspacing)
-        fig.update_yaxes(
-            categoryorder="total ascending",  # keeps nice order
-            showgrid=show_grid
-        )
+        # # Correct Y axis settings (no categoryspacing)
+        # fig.update_yaxes(
+        #     categoryorder="total ascending",  # keeps nice order
+        #     showgrid=show_grid
+        # )
 
         # X axis date settings
         fig.update_xaxes(
