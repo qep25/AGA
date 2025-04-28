@@ -1,5 +1,4 @@
 import streamlit as st
-import plotly.express as px
 import pandas as pd
 import os
 import io
@@ -7,7 +6,7 @@ from datetime import datetime
 
 # ── Page setup ──
 st.set_page_config(layout="wide")
-st.title("📆 TNB Tariff Communication Timeline")
+st.title("📆 TNB Tariff Communication Timeline (Matrix View)")
 st.markdown("Use the editor below to update task dates directly. Duration will update automatically.")
 
 SAVE_PATH = "saved_timeline.csv"
@@ -64,15 +63,12 @@ else:
 df["Duration (days)"] = (df["Finish"] - df["Start"]).dt.days
 
 # ── Sidebar settings ──
-st.sidebar.header("⚙️ Graph Settings")
-show_grid = st.sidebar.checkbox("Show X and Y Axis Grid", value=True)
-show_border = st.sidebar.checkbox("Show Task Bar Borders", value=False)
-add_today_line = st.sidebar.checkbox("Add Vertical Line for Today", value=False)
-view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Table View"])
-time_view = st.sidebar.radio("Timeline X-axis Type", ["Date View", "Week View (5 days)"])
+st.sidebar.header("⚙️ Settings")
+show_save = st.sidebar.checkbox("Show Save Button", value=True)
+show_download = st.sidebar.checkbox("Show Download Button", value=True)
 
 # ── Editable table ──
-st.subheader("📝 Edit Dates Inline")
+st.subheader("📝 Edit Task Dates Inline")
 df_edit = st.data_editor(
     df,
     num_rows="fixed",
@@ -83,124 +79,73 @@ df_edit = st.data_editor(
     }
 )
 
-# ── Unsaved warning ──
-edited = not df_edit.equals(df)
-if edited:
-    st.warning("⚠️ You have unsaved changes. Don't forget to click '💾 Save Timeline'!")
-
 # ── Save button ──
-if st.button("💾 Save Timeline", type="primary"):
-    df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
-    df_edit.to_csv(SAVE_PATH, index=False)
-    st.success("✅ Timeline saved successfully!")
+if show_save:
+    if st.button("💾 Save Timeline", type="primary"):
+        df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
+        df_edit.to_csv(SAVE_PATH, index=False)
+        st.success("✅ Timeline saved successfully!")
 
 # ── Download Excel button ──
-excel_buffer = io.BytesIO()
-with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
-    df_edit.to_excel(writer, index=False, sheet_name="Timeline")
+if show_download:
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+        df_edit.to_excel(writer, index=False, sheet_name="Timeline")
+    st.download_button(
+        label="📥 Download Timeline as Excel",
+        data=excel_buffer,
+        file_name="tnb_timeline.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
-st.download_button(
-    label="📥 Download Timeline as Excel",
-    data=excel_buffer,
-    file_name="tnb_timeline.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
+# ── Matrix View: Task vs Month Week ──
+st.subheader("📊 Timeline Matrix (Month-Week View)")
 
-# ── Gantt Chart or Table View ──
-st.subheader("📊 Timeline View")
+# Only show if Start/Finish available
+if not df_edit["Start"].isna().all():
+    chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
 
-if view_mode == "Gantt Chart":
-    if not df_edit["Start"].isna().all():
-        chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
+    # Define month-week label function
+    def month_week_label(date):
+        if pd.isnull(date):
+            return None
+        month_start = pd.Timestamp(date.year, date.month, 1)
+        days_since_month_start = (date - month_start).days
+        week_count = 0
+        for d in pd.date_range(start=month_start, end=date):
+            if d.weekday < 5:  # Mon-Fri only
+                if d == date:
+                    break
+                if d.weekday == 0 and (d - month_start).days != 0:
+                    week_count += 1
+        return f"{date.strftime('%b')} W{week_count + 1}"
 
-        if time_view == "Week View (5 days)":
-            start_reference = pd.Timestamp("2025-03-10")  # Monday
+    # Map each task to active week labels
+    task_week_mapping = {}
+    for idx, row in chart_df.iterrows():
+        start_date = row["Start"]
+        finish_date = row["Finish"]
+        all_dates = pd.date_range(start=start_date, end=finish_date, freq="D")
+        working_days = all_dates[all_dates.weekday < 5]
+        week_labels = working_days.map(month_week_label).unique()
+        task_week_mapping[row["Task"]] = week_labels
 
-            # Custom working days calculation
-            def working_days_since_start(date):
-                if pd.isnull(date):
-                    return None
-                days = (date - start_reference).days
-                full_weeks = days // 7
-                extra_days = days % 7
-                weekdays_count = full_weeks * 5
-                if extra_days > 4:
-                    weekdays_count += 5
-                else:
-                    weekdays_count += extra_days
-                return weekdays_count // 5 + 1
+    # Create matrix
+    all_weeks = sorted(set(label for labels in task_week_mapping.values() for label in labels))
+    grid = pd.DataFrame("", index=chart_df["Task"], columns=all_weeks)
 
-            # Apply custom week calculation
-            chart_df["Start Week"] = chart_df["Start"].apply(working_days_since_start)
-            chart_df["Finish Week"] = chart_df["Finish"].apply(working_days_since_start)
+    for task, weeks in task_week_mapping.items():
+        for week in weeks:
+            grid.at[task, week] = "active"
 
-            chart_df["Start"] = chart_df["Start Week"]
-            chart_df["Finish"] = chart_df["Finish Week"]
+    # Show colored matrix
+    def color_active(val):
+        if val == "active":
+            return 'background-color: lightcoral; color: black;'
+        return ''
 
-            fig = px.timeline(
-                chart_df,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Task"
-            )
+    st.dataframe(grid.style.applymap(color_active), use_container_width=True)
 
-            fig.update_traces(width=0.9, offset=0)
-            fig.update_yaxes(autorange="reversed", showgrid=show_grid)
-            fig.update_layout(
-                showlegend=False,
-                height=1000,
-                margin=dict(l=50, r=50, t=50, b=50),
-                bargap=0
-            )
+else:
+    st.info("⏳ Please add Start and Finish dates to see the Timeline Matrix.")
 
-            max_week = int(chart_df["Finish"].max()) + 1
-            fig.update_xaxes(
-                tickvals=list(range(1, max_week)),
-                ticktext=[f"Week {i}" for i in range(1, max_week)],
-                tickangle=0,
-                showgrid=show_grid
-            )
-
-            if add_today_line:
-                today = pd.Timestamp(datetime.today())
-                today_working_days = working_days_since_start(today)
-                fig.add_vline(x=today_working_days, line_width=2, line_dash="dash", line_color="red")
-
-        else:  # Normal Date View
-            fig = px.timeline(
-                chart_df,
-                x_start="Start",
-                x_end="Finish",
-                y="Task",
-                color="Task"
-            )
-            fig.update_traces(width=0.9, offset=0)
-            fig.update_yaxes(autorange="reversed", showgrid=show_grid)
-            fig.update_layout(
-                showlegend=False,
-                height=1000,
-                margin=dict(l=50, r=50, t=50, b=50),
-                bargap=0
-            )
-            fig.update_xaxes(
-                dtick="D3",
-                tickformat="%d %b",
-                tickangle=30,
-                showgrid=show_grid
-            )
-
-            if add_today_line:
-                today = datetime.today()
-                fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
-
-        if show_border:
-            fig.update_traces(marker_line_color='black', marker_line_width=1)
-
-        st.plotly_chart(fig, use_container_width=True)
-
-    else:
-        st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
-
-elif view_mode == "Table View":
-    st.dataframe(df_edit, use_container_width=True)
