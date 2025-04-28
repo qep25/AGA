@@ -116,3 +116,4 @@ if view_mode == "Gantt Chart":
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
+    #try
