@@ -87,7 +87,7 @@ if view_mode == "Gantt Chart":
         fig.update_traces(width=0.6)  # Thicker task bars
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(showlegend=False, height=1000, margin=dict(l=50, r=50, t=50, b=50))
-        fig.update_layout(bargap=0)
+        fig.update_layout(bargap=0.01)
 
         # Correct Y axis settings (no categoryspacing)
         fig.update_yaxes(
@@ -108,7 +108,7 @@ if view_mode == "Gantt Chart":
 
         if add_today_line:
             today = datetime.today()
-            fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
+            fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
     else:
