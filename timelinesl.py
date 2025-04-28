@@ -84,23 +84,22 @@ if view_mode == "Gantt Chart":
     if not df_edit["Start"].isna().all():
         chart_df = df_edit.dropna(subset=["Start", "Finish"])
         fig = px.timeline(chart_df, x_start="Start", x_end="Finish", y="Task", color="Task")
-        fig.update_traces(width=0.6)  # 🔥 make bars thicker
+        fig.update_traces(width=0.6)  # Thicker task bars
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(showlegend=False, height=1000, margin=dict(l=50, r=50, t=50, b=50))
         fig.update_layout(bargap=0)
-        fig.update_layout(
-            yaxis=dict(
-                categoryorder='total ascending',  # clean order
-                categoryspacing=0.05               # 🔥 very small gap between bars
-            )
+
+        # Correct Y axis settings (no categoryspacing)
+        fig.update_yaxes(
+            categoryorder="total ascending",  # keeps nice order
+            showgrid=show_grid
         )
+
+        # X axis date settings
         fig.update_xaxes(
             dtick="D3",
             tickformat="%d %b",
             tickangle=30,
-            showgrid=show_grid
-        )
-        fig.update_yaxes(
             showgrid=show_grid
         )
 
