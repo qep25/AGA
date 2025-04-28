@@ -1,10 +1,10 @@
-
 import streamlit as st
 import plotly.express as px
 import pandas as pd
 import os
 from datetime import date, datetime
 
+# Streamlit page setup
 st.set_page_config(layout="wide")
 st.title("📆 TNB Tariff Communication Timeline")
 st.markdown("Use the editor below to update task dates directly. Duration will update automatically.")
@@ -42,7 +42,7 @@ topics = [
     "H. Targeted Subsidies to Support Low-Income Users"
 ]
 
-# Load or create dataframe
+# Load or initialize CSV
 if os.path.exists(SAVE_PATH):
     df = pd.read_csv(SAVE_PATH, parse_dates=["Start", "Finish"])
 else:
@@ -50,7 +50,7 @@ else:
     df["Start"] = pd.NaT
     df["Finish"] = pd.NaT
 
-# Calculate duration
+# Calculate Duration
 df["Duration (days)"] = (df["Finish"] - df["Start"]).dt.days
 
 # Sidebar settings
@@ -72,22 +72,28 @@ df_edit = st.data_editor(
     }
 )
 
-# Recalculate and save updated data
+# Recalculate Duration
 df_edit["Duration (days)"] = (df_edit["Finish"] - df_edit["Start"]).dt.days
 
-# Save to CSV
+# Save updates
 df_edit.to_csv(SAVE_PATH, index=False)
 
-# Show either Gantt chart or Table view
+# Show View
 st.subheader("📊 Timeline View")
 if view_mode == "Gantt Chart":
     if not df_edit["Start"].isna().all():
         chart_df = df_edit.dropna(subset=["Start", "Finish"])
         fig = px.timeline(chart_df, x_start="Start", x_end="Finish", y="Task", color="Task")
-        fig.update_traces(width=0.6)  # 🔥 Fix: Make task bars thicker
+        fig.update_traces(width=0.6)  # 🔥 make bars thicker
         fig.update_yaxes(autorange="reversed")
         fig.update_layout(showlegend=False, height=1000, margin=dict(l=50, r=50, t=50, b=50))
         fig.update_layout(bargap=0)
+        fig.update_layout(
+            yaxis=dict(
+                categoryorder='total ascending',  # clean order
+                categoryspacing=0.05               # 🔥 very small gap between bars
+            )
+        )
         fig.update_xaxes(
             dtick="D3",
             tickformat="%d %b",
