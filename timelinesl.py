@@ -130,7 +130,7 @@ if not df_edit["Start"].isna().all():
             showgrid=True
         )
         today = datetime.today()
-        fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
+        fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
 
         st.plotly_chart(fig, use_container_width=True)
 
