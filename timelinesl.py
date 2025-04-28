@@ -107,7 +107,7 @@ if not df_edit["Start"].isna().all():
 
     chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
 
-    # 🛠 Force correct task order here!
+    # 🛠 Force correct task order here
     chart_df["Task"] = pd.Categorical(chart_df["Task"], categories=topics, ordered=True)
     chart_df = chart_df.sort_values("Task")
 
@@ -120,7 +120,11 @@ if not df_edit["Start"].isna().all():
             color="Task"
         )
         fig.update_traces(width=0.9, offset=0)
-        fig.update_yaxes(autorange="reversed", showgrid=True)
+        fig.update_yaxes(
+            categoryorder='array',
+            categoryarray=topics[::-1],  # 🛠 Manual y-axis task order
+            showgrid=True
+        )
         fig.update_layout(
             showlegend=False,
             height=1000,
@@ -162,7 +166,6 @@ if not df_edit["Start"].isna().all():
             week_labels = working_days.map(month_week_label).unique()
             task_week_mapping[row["Task"]] = week_labels
 
-        # Build grid with manual task order
         ordered_tasks = [task for task in topics if task in chart_df["Task"].values]
         all_weeks = sorted(set(label for labels in task_week_mapping.values() for label in labels))
         grid = pd.DataFrame("", index=ordered_tasks, columns=all_weeks)
@@ -171,7 +174,6 @@ if not df_edit["Start"].isna().all():
             for week in weeks:
                 grid.at[task, week] = "active"
 
-        # Improved styling
         def style_matrix(val):
             if val == "active":
                 return 'background-color: lightcoral; color: black; text-align: center; font-weight: bold;'
