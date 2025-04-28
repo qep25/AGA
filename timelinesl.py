@@ -113,10 +113,10 @@ if not df_edit["Start"].isna().all():
         days_since_month_start = (date - month_start).days
         week_count = 0
         for d in pd.date_range(start=month_start, end=date):
-            if d.weekday < 5:  # Mon-Fri only
+            if d.weekday() < 5:  # << Correct: weekday() as method
                 if d == date:
                     break
-                if d.weekday == 0 and (d - month_start).days != 0:
+                if d.weekday() == 0 and (d - month_start).days != 0:
                     week_count += 1
         return f"{date.strftime('%b')} W{week_count + 1}"
 
@@ -148,4 +148,3 @@ if not df_edit["Start"].isna().all():
 
 else:
     st.info("⏳ Please add Start and Finish dates to see the Timeline Matrix.")
-
