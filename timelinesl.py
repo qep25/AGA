@@ -119,7 +119,7 @@ if view_mode == "Gantt Chart":
             color="Task"
         )
         fig.update_traces(
-            width=0.9,   # wider bars for better alignment
+            width=0.9,
             offset=0
         )
         fig.update_yaxes(
@@ -131,12 +131,6 @@ if view_mode == "Gantt Chart":
             height=1000,
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
-        )
-        fig.update_layout(
-            xaxis_range=[
-                chart_df["Start"].min() - pd.Timedelta(days=2),
-                chart_df["Finish"].max() + pd.Timedelta(days=2)
-            ]
         )
         fig.update_xaxes(
             dtick="D3",
@@ -155,6 +149,7 @@ if view_mode == "Gantt Chart":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
+
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
