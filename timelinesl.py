@@ -69,6 +69,7 @@ show_grid = st.sidebar.checkbox("Show X and Y Axis Grid", value=True)
 show_border = st.sidebar.checkbox("Show Task Bar Borders", value=False)
 add_today_line = st.sidebar.checkbox("Add Vertical Line for Today", value=False)
 view_mode = st.sidebar.radio("View Mode", ["Gantt Chart", "Table View"])
+time_view = st.sidebar.radio("Timeline X-axis Type", ["Date View", "Week View (5 days)"])
 
 # ── Editable table ──
 st.subheader("📝 Edit Dates Inline")
@@ -105,51 +106,101 @@ st.download_button(
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
 
-# ── Show Timeline View or Table ──
+# ── Gantt Chart or Table View ──
 st.subheader("📊 Timeline View")
 
 if view_mode == "Gantt Chart":
     if not df_edit["Start"].isna().all():
-        chart_df = df_edit.dropna(subset=["Start", "Finish"])
-        fig = px.timeline(
-            chart_df,
-            x_start="Start",
-            x_end="Finish",
-            y="Task",
-            color="Task"
-        )
-        fig.update_traces(
-            width=0.9,
-            offset=0
-        )
-        fig.update_yaxes(
-            autorange="reversed",
-            showgrid=show_grid
-        )
-        fig.update_layout(
-            showlegend=False,
-            height=1000,
-            margin=dict(l=50, r=50, t=50, b=50),
-            bargap=0
-        )
-        fig.update_xaxes(
-            dtick="D3",
-            tickformat="%d %b",
-            tickangle=30,
-            showgrid=show_grid
-        )
+        chart_df = df_edit.dropna(subset=["Start", "Finish"]).copy()
+
+        if time_view == "Week View (5 days)":
+            start_reference = pd.Timestamp("2025-03-10")  # Monday
+
+            # Custom working days calculation
+            def working_days_since_start(date):
+                if pd.isnull(date):
+                    return None
+                days = (date - start_reference).days
+                full_weeks = days // 7
+                extra_days = days % 7
+                weekdays_count = full_weeks * 5
+                if extra_days > 4:
+                    weekdays_count += 5
+                else:
+                    weekdays_count += extra_days
+                return weekdays_count // 5 + 1
+
+            # Apply custom week calculation
+            chart_df["Start Week"] = chart_df["Start"].apply(working_days_since_start)
+            chart_df["Finish Week"] = chart_df["Finish"].apply(working_days_since_start)
+
+            chart_df["Start"] = chart_df["Start Week"]
+            chart_df["Finish"] = chart_df["Finish Week"]
+
+            fig = px.timeline(
+                chart_df,
+                x_start="Start",
+                x_end="Finish",
+                y="Task",
+                color="Task"
+            )
+
+            fig.update_traces(width=0.9, offset=0)
+            fig.update_yaxes(autorange="reversed", showgrid=show_grid)
+            fig.update_layout(
+                showlegend=False,
+                height=1000,
+                margin=dict(l=50, r=50, t=50, b=50),
+                bargap=0
+            )
+
+            max_week = int(chart_df["Finish"].max()) + 1
+            fig.update_xaxes(
+                tickvals=list(range(1, max_week)),
+                ticktext=[f"Week {i}" for i in range(1, max_week)],
+                tickangle=0,
+                showgrid=show_grid
+            )
+
+            if add_today_line:
+                today = pd.Timestamp(datetime.today())
+                today_working_days = working_days_since_start(today)
+                fig.add_vline(x=today_working_days, line_width=2, line_dash="dash", line_color="red")
+
+        else:  # Normal Date View
+            fig = px.timeline(
+                chart_df,
+                x_start="Start",
+                x_end="Finish",
+                y="Task",
+                color="Task"
+            )
+            fig.update_traces(width=0.9, offset=0)
+            fig.update_yaxes(autorange="reversed", showgrid=show_grid)
+            fig.update_layout(
+                showlegend=False,
+                height=1000,
+                margin=dict(l=50, r=50, t=50, b=50),
+                bargap=0
+            )
+            fig.update_xaxes(
+                dtick="D3",
+                tickformat="%d %b",
+                tickangle=30,
+                showgrid=show_grid
+            )
+
+            if add_today_line:
+                today = datetime.today()
+                fig.add_vline(x=today, line_width=2, line_dash="dash", line_color="red")
 
         if show_border:
-            fig.update_traces(marker_line_color='black', marker_line_width=0.5)
-
-        if add_today_line:
-            today = datetime.today()
-            fig.add_vline(x=today, line_width=1, line_dash="dash", line_color="red")
+            fig.update_traces(marker_line_color='black', marker_line_width=1)
 
         st.plotly_chart(fig, use_container_width=True)
+
     else:
         st.info("⏳ Add Start and Finish dates to tasks to generate Gantt chart.")
-
 
 elif view_mode == "Table View":
     st.dataframe(df_edit, use_container_width=True)
