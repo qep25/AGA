@@ -106,7 +106,7 @@ if view_mode == "Gantt Chart":
         )
         fig.update_layout(
             showlegend=False,
-            height=1000,
+            height=0.6,
             margin=dict(l=50, r=50, t=50, b=50),
             bargap=0
         )
