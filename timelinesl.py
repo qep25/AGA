@@ -3,7 +3,6 @@ import plotly.express as px
 import pandas as pd
 import os
 import io
-import random
 from datetime import datetime
 
 # 👇 MUST be FIRST after imports
@@ -176,8 +175,13 @@ if not df_edit["Start"].isna().all():
             for week in weeks:
                 grid.at[task, week] = "active"
 
-        # 🧹 Show clean active labels, no color
-        st.dataframe(grid, use_container_width=True)
+        # 🖌️ Apply ONE consistent color for all 'active' cells
+        def highlight_active(val):
+            if val == "active":
+                return 'background-color: #ADD8E6'  # light blue
+            return ''
+
+        st.dataframe(grid.style.applymap(highlight_active), use_container_width=True)
 
 else:
     st.info("⏳ Please add Start and Finish dates to see the timeline.")
